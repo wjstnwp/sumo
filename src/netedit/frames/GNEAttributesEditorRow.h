@@ -20,16 +20,15 @@
 #pragma once
 #include <config.h>
 
-#include <netedit/elements/GNEAttributeCarrier.h>
-
 #include "GNEAttributesEditor.h"
 
 // ===========================================================================
 // class declaration
 // ===========================================================================
 
-class GNEAttributesEditor;
 class GNEAttributeCarrier;
+class MFXLabelTooltip;
+class MFXTextFieldTooltip;
 
 // ===========================================================================
 // class definitions
@@ -44,13 +43,28 @@ public:
     GNEAttributesEditorRow(GNEAttributesEditor* attributeTable);
 
     /// @brief return true if attribute row was successfully show
-    bool showAttributeRow(const GNEAttributeProperties* attrProperty, const bool forceDisable);
+    bool showAttributeRow(GNEAttributesEditor* attributeTable, const GNEAttributeProperties* attrProperty, const bool forceDisable);
 
     /// @brief hide attribute row (always return false)
     bool hideAttributeRow();
 
+    /// @brief disable
+    void disable();
+
+    /// @brief get attribute property
+    const GNEAttributeProperties* getAttrProperty() const;
+
+    /// @brief get current value in string format
+    std::string getCurrentValue() const;
+
+    /// @brief check if current attribute row is valid
+    bool isValueValid() const;
+
     /// @brief check if current attribute row is shown
     bool isAttributeRowShown() const;
+
+    /// @brief fill sumo Base object
+    SumoXMLAttr fillSumoBaseObject(CommonXMLStructure::SumoBaseObject* baseObjet) const;
 
     /// @name FOX-callbacks
     /// @{
@@ -127,15 +141,12 @@ protected:
     /// @brief check if the given attribute is enabled
     bool isAttributeEnabled(const GNEAttributeProperties* attrProperty) const;
 
-    /// @brief check junction merging
-    /// bool mergeJunction(SumoXMLAttr attr, const std::string& newVal) const;
-
 private:
     /// @brief pointer to attribute table parent
     GNEAttributesEditor* myAttributeTable;
 
-    /// @brief edited attribute
-    SumoXMLAttr myAttribute = SUMO_ATTR_NOTHING;
+    /// @brief edited attribute property
+    const GNEAttributeProperties* myAttrProperty = nullptr;
 
     /// @brief pointer to attribute label
     MFXLabelTooltip* myAttributeLabel = nullptr;

@@ -6,6 +6,7 @@ pipeline {
     }
     environment {
         PATH = "${env.PATH}:/opt/homebrew/bin"
+        GITHUB_TOKEN = credentials('github-bot-token')
     }
     stages {
         stage('Clean Workspace') {
@@ -346,20 +347,40 @@ pipeline {
                 }
             }
         }
-        stage('Building DMG') {
+
+        stage('Uploading notarized artifacts to GitHub') {
             steps {
                 unstash 'notarized'
-                sh """
-                  # Determine the name of the dmg file based on the sumo*.pkg file
-                  file="\$(ls installer/sumo*.pkg)"
-                  file=\$(basename "\$file")
-                  dmg_file="\${file%.pkg}.dmg"
+                script {
+                    def commitHash = sh(script: "cd sumo && git rev-parse HEAD", returnStdout: true).trim()
+                    def branchName = sh(script: "cd sumo && git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    def githubRepo = "eclipse-sumo/sumo"
+                    def workflowId = "macos.yml"
+                    def githubToken = credentials('github-bot-token')
 
-                  # Create the dmg file
-                  env/bin/python3 sumo/tools/build_config/buildMacOSInstaller.py --create-installer-dmg \
-                      --installer-pkg-file notarized/sumo*.pkg \
-                      --installer-dmg-file notarized/\${dmg_file}
-                """
+                    echo "Searching for GitHub Actions workflow run for commit: ${commitHash} on branch: ${branchName}"
+
+                    // Fetch latest workflow runs from GitHub API
+                    def apiUrl = "https://api.github.com/repos/${githubRepo}/actions/workflows/${workflowId}/runs?branch=${branchName}&per_page=5"
+                    def jsonResponse = sh(
+                        script: 'curl -s -H "Authorization: Bearer ' + GITHUB_TOKEN + '" "' + apiUrl + '"',
+                        returnStdout: true
+                    ).trim()
+
+                    // Parse JSON response using JsonSlurper
+                    def json = new JsonSlurper().parseText(jsonResponse)
+                    def workflowRuns = json.workflow_runs
+
+                    // Find the workflow run with the correct commit hash
+                    def matchedRun = workflowRuns.find { it.head_sha == commitHash }
+
+                    if (!matchedRun) {
+                        error "No matching workflow run found for commit: ${commitHash}."
+                    }
+
+                    def runId = matchedRun.id
+                    echo "Found Workflow Run ID: ${runId}"
+                }
             }
         }
     }

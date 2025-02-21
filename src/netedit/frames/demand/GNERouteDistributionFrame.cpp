@@ -18,6 +18,8 @@
 // The Widget for edit route distribution elements
 /****************************************************************************/
 
+#include <utils/gui/images/GUIIconSubSys.h>
+
 #include "GNERouteDistributionFrame.h"
 
 // ===========================================================================
@@ -34,7 +36,9 @@ GNERouteDistributionFrame::GNERouteDistributionFrame(GNEViewParent* viewParent, 
     myDistributionSelector = new GNEDistributionFrame::DistributionSelector(this);
 
     /// @brief distribution attributes editor
-    myAttributesEditor = new GNEAttributesEditor(this, TL("Attributes"), GNEAttributesEditor::EditorOptions::BASIC_ATTRIBUTES);
+    myAttributesEditor = new GNEAttributesEditor(this, TL("Attributes"),
+            GNEAttributesEditor::EditorType::EDITOR,
+            GNEAttributesEditor::AttributeType::BASIC);
 
     // Create route distribution attributes editor
     myDistributionValuesEditor = new GNEDistributionFrame::DistributionValuesEditor(this, myDistributionEditor, myDistributionSelector, myAttributesEditor, SUMO_TAG_ROUTE);

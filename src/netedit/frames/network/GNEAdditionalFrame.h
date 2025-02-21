@@ -20,14 +20,11 @@
 #pragma once
 #include <config.h>
 
-#include <netedit/frames/GNEAttributesCreator.h>
 #include <netedit/frames/GNEConsecutiveSelector.h>
 #include <netedit/frames/GNEFrame.h>
-#include <netedit/frames/GNENeteditAttributes.h>
 #include <netedit/frames/GNENetworkSelector.h>
 #include <netedit/frames/GNESelectorParent.h>
 #include <netedit/frames/GNETagSelector.h>
-
 
 // ===========================================================================
 // class definitions
@@ -117,7 +114,7 @@ public:
     GNEConsecutiveSelector* getConsecutiveLaneSelector() const;
 
     /// @brief get Netedit parameter
-    GNENeteditAttributes* getNeteditAttributes() const;
+    GNEAttributesEditor* getNeteditAttributesEditor() const;
 
     /// @brief create path
     bool createPath(const bool useLastRoute);
@@ -130,29 +127,26 @@ protected:
     void tagSelected();
 
 private:
-    // @brief create baseAdditionalObject
-    bool createBaseAdditionalObject(const GNETagProperties* tagProperty);
+    // @brief reste base additional object
+    void resetBaseAdditionalObject();
+
+    // @brief init baseAdditionalObject
+    bool initBaseAdditionalObject(const GNETagProperties* tagProperty, const GNEViewNetHelper::ViewObjectsSelector& viewObjects);
 
     /// @brief build common additional attributes
     bool buildAdditionalCommonAttributes(const GNETagProperties* tagValues);
 
-    /// @brief build additional over an edge (parent of lane)
-    bool buildAdditionalOverEdge(GNELane* lane, const GNETagProperties* tagValues);
-
-    /// @brief build additional over a single lane
-    bool buildAdditionalOverLane(GNELane* lane, const GNETagProperties* tagValues);
-
-    /// @brief build additional over view
-    bool buildAdditionalOverView(const GNETagProperties* tagValues);
-
     /// @brief item selector
     GNETagSelector* myAdditionalTagSelector = nullptr;
 
-    /// @brief internal additional attributes
-    GNEAttributesCreator* myAdditionalAttributes = nullptr;
+    /// @brief additional attributes editor
+    GNEAttributesEditor* myAdditionalAttributesEditor = nullptr;
 
-    /// @brief Netedit parameter
-    GNENeteditAttributes* myNeteditAttributes = nullptr;
+    /// @brief Netedit attributes editor
+    GNEAttributesEditor* myNeteditAttributesEditor = nullptr;
+
+    /// @brief Generic parameters editor
+    GNEAttributesEditor* myGenericParametersEditor = nullptr;
 
     /// @brief Module for select a single parent additional
     GNESelectorParent* mySelectorAdditionalParent = nullptr;

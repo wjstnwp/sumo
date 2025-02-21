@@ -21,15 +21,12 @@
 #include <config.h>
 
 #include <netedit/elements/demand/GNERouteHandler.h>
-#include <netedit/frames/GNEAttributesCreator.h>
 #include <netedit/frames/GNEDemandSelector.h>
 #include <netedit/frames/GNEFrame.h>
-#include <netedit/frames/GNENeteditAttributes.h>
 #include <netedit/frames/GNEPlanCreator.h>
 #include <netedit/frames/GNEPlanCreatorLegend.h>
 #include <netedit/frames/GNETagSelector.h>
 #include <netedit/frames/GNEPlanSelector.h>
-
 
 // ===========================================================================
 // class definitions
@@ -71,7 +68,7 @@ public:
     GNEPlanSelector* getPlanSelector() const;
 
     /// @brief get attributes creator
-    GNEAttributesCreator* getPersonAttributes() const;
+    GNEAttributesEditor* getPersonAttributes() const;
 
 protected:
     /// @brief Tag selected in GNETagSelector
@@ -100,13 +97,13 @@ private:
     GNEPlanSelector* myPlanSelector;
 
     /// @brief internal vehicle attributes
-    GNEAttributesCreator* myPersonAttributes;
+    GNEAttributesEditor* myPersonAttributesEditor;
 
     /// @brief internal person plan attributes
-    GNEAttributesCreator* myPersonPlanAttributes;
+    GNEAttributesEditor* myPersonPlanAttributesEditor;
 
-    /// @brief Netedit parameter
-    GNENeteditAttributes* myNeteditAttributes;
+    /// @brief Netedit attributes editor
+    GNEAttributesEditor* myNeteditAttributesEditor = nullptr;
 
     /// @brief plan creator
     GNEPlanCreator* myPlanCreator;

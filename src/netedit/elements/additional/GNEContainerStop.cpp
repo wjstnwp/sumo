@@ -17,15 +17,11 @@
 ///
 // A lane area vehicles can halt at (GNE version)
 /****************************************************************************/
-#include <config.h>
 
 #include <netedit/GNENet.h>
 #include <netedit/GNETagProperties.h>
-#include <netedit/GNEUndoList.h>
-#include <netedit/GNEViewNet.h>
 #include <netedit/changes/GNEChange_Attribute.h>
 #include <utils/gui/div/GLHelper.h>
-#include <utils/gui/div/GUIGlobalViewObjectsHandler.h>
 #include <utils/options/OptionsCont.h>
 #include <utils/vehicle/SUMORouteHandler.h>
 
@@ -44,11 +40,10 @@ GNEContainerStop::GNEContainerStop(const std::string& id, GNELane* lane, GNENet*
                                    const std::string& name, const std::vector<std::string>& lines, int containerCapacity, double parkingLength, const RGBColor& color,
                                    bool friendlyPosition, const Parameterised::Map& parameters) :
     GNEStoppingPlace(id, net, GLO_CONTAINER_STOP, SUMO_TAG_CONTAINER_STOP, GUIIconSubSys::getIcon(GUIIcon::CONTAINER),
-                     lane, startPos, endPos, name, friendlyPosition, parameters),
+                     lane, startPos, endPos, name, friendlyPosition, color, parameters),
     myLines(lines),
     myContainerCapacity(containerCapacity),
-    myParkingLength(parkingLength),
-    myColor(color) {
+    myParkingLength(parkingLength) {
     // update centering boundary without updating grid
     updateCenteringBoundary(false);
 }
@@ -222,7 +217,7 @@ GNEContainerStop::getAttribute(SumoXMLAttr key) const {
         case GNE_ATTR_SHIFTLANEINDEX:
             return "";
         default:
-            return getCommonAttribute(this, key);
+            return getStoppingPlaceAttribute(this, key);
     }
 }
 
@@ -244,7 +239,7 @@ GNEContainerStop::setAttribute(SumoXMLAttr key, const std::string& value, GNEUnd
             GNEChange_Attribute::changeAttribute(this, key, value, undoList);
             break;
         default:
-            setCommonAttribute(key, value, undoList);
+            setStoppingPlaceAttribute(key, value, undoList);
             break;
     }
 }
@@ -294,7 +289,7 @@ GNEContainerStop::isValid(SumoXMLAttr key, const std::string& value) {
                 return canParse<RGBColor>(value);
             }
         default:
-            return isCommonValid(key, value);
+            return isStoppingPlaceValid(key, value);
     }
 }
 
@@ -352,7 +347,7 @@ GNEContainerStop::setAttribute(SumoXMLAttr key, const std::string& value) {
             shiftLaneIndex();
             break;
         default:
-            setCommonAttribute(this, key, value);
+            setStoppingPlaceAttribute(this, key, value);
             break;
     }
 }

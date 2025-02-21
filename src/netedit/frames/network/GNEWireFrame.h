@@ -21,12 +21,9 @@
 #include <config.h>
 
 #include <netedit/frames/GNEFrame.h>
-#include <netedit/frames/GNEAttributesCreator.h>
 #include <netedit/frames/GNEConsecutiveSelector.h>
 #include <netedit/frames/GNESelectorParent.h>
 #include <netedit/frames/GNETagSelector.h>
-#include <netedit/frames/GNENeteditAttributes.h>
-
 
 // ===========================================================================
 // class definitions
@@ -80,10 +77,10 @@ private:
     GNETagSelector* myWireTagSelector = nullptr;
 
     /// @brief internal wire attributes
-    GNEAttributesCreator* myWireAttributes = nullptr;
+    GNEAttributesEditor* myWireAttributesEditor = nullptr;
 
-    /// @brief Netedit parameter
-    GNENeteditAttributes* myNeteditAttributes = nullptr;
+    /// @brief Netedit attributes editor
+    GNEAttributesEditor* myNeteditAttributesEditor = nullptr;
 
     /// @brief Select wire parent
     GNESelectorParent* mySelectorWireParent = nullptr;

@@ -39,6 +39,12 @@
 #include "GNEAttributesEditorRow.h"
 
 // ===========================================================================
+// static members
+// ===========================================================================
+
+GNEAttributesEditor::AttributesEditorRows GNEAttributesEditor::mySingletonAttributesEditorRows = {};
+
+// ===========================================================================
 // FOX callback mapping
 // ===========================================================================
 
@@ -57,43 +63,28 @@ FXIMPLEMENT(GNEAttributesEditor,  MFXGroupBoxModule,  GNEAttributeTableMap,   AR
 // method definitions
 // ===========================================================================
 
-GNEAttributesEditor::GNEAttributesEditor(GNEFrame* frameParent, const std::string attributesEditorName, const int editorOptions) :
+GNEAttributesEditor::GNEAttributesEditor(GNEFrame* frameParent, const std::string attributesEditorName, EditorType editorType, AttributeType attributeType) :
     MFXGroupBoxModule(frameParent, attributesEditorName.c_str()),
     myFrameParent(frameParent),
-    myEditorOptions(editorOptions) {
-    // adjust max number of rows
-    if ((myEditorOptions & EditorOptions::BASIC_ATTRIBUTES) != 0) {
-        myMaxNumberOfRows = frameParent->getViewNet()->getNet()->getTagPropertiesDatabase()->getMaxNumberOfEditableAttributes();
-    } else if ((myEditorOptions & EditorOptions::FLOW_ATTRIBUTES) != 0) {
-        myMaxNumberOfRows = frameParent->getViewNet()->getNet()->getTagPropertiesDatabase()->getMaxNumberOfFlowAttributes();
-    } else if ((myEditorOptions & EditorOptions::GEO_ATTRIBUTES) != 0) {
-        myMaxNumberOfRows = frameParent->getViewNet()->getNet()->getTagPropertiesDatabase()->getMaxNumberOfGeoAttributes();
-    } else if ((myEditorOptions & EditorOptions::NETEDIT_ATTRIBUTES) != 0) {
-        myMaxNumberOfRows = frameParent->getViewNet()->getNet()->getTagPropertiesDatabase()->getMaxNumberOfNeteditAttributes();
+    myEditorType(editorType),
+    myAttributeType(attributeType) {
+    // create netedit especific buttons (before row)
+    if (attributeType == AttributeType::NETEDIT) {
         // create netedit editor buttons
         myFrontButton = GUIDesigns::buildFXButton(getCollapsableFrame(), TL("Front element"), "", "", GUIIconSubSys::getIcon(GUIIcon::FRONTELEMENT), this, MID_GNE_ATTRIBUTESEDITOR_FRONT, GUIDesignButton);
         myFrontButton->hide();
         myOpenDialogButton = GUIDesigns::buildFXButton(getCollapsableFrame(), TL("Open element dialog"), "", "", nullptr, this, MID_GNE_ATTRIBUTESEDITOR_DIALOG, GUIDesignButton);
         myOpenDialogButton->hide();
-    } else if ((myEditorOptions & EditorOptions::EXTENDED_ATTRIBUTES) != 0) {
-        // create extended attributes
+    }
+    // build rows
+    buildRows(this);
+    // create specific buttons for extended and parameteres
+    if (myAttributeType == AttributeType::EXTENDED) {
+        // create extended attributes (always shown)
         myOpenExtendedAttributesButton = GUIDesigns::buildFXButton(getCollapsableFrame(), TL("Edit extended attributes"), "", "", nullptr, this, MID_GNE_ATTRIBUTESEDITOR_EXTENDED, GUIDesignButton);
-        myOpenExtendedAttributesButton->hide();
-    } else if ((myEditorOptions & EditorOptions::GENERIC_PARAMETERS) != 0) {
-        myMaxNumberOfRows = 1;
-    } else {
-        throw ProcessError("Invalid editor option");
-    }
-    // resize myAttributesEditorRows and fill it with attribute rows
-    myAttributesEditorRows.resize(myMaxNumberOfRows);
-    for (int i = 0; i < myMaxNumberOfRows; i++) {
-        myAttributesEditorRows[i] = new GNEAttributesEditorRow(this);
-    }
-    // create generic parameters editor button
-    if ((myEditorOptions & EditorOptions::GENERIC_PARAMETERS) != 0) {
-        // create generic attributes editor button
+    } else if (myAttributeType == AttributeType::PARAMETERS) {
+        // create generic attributes editor button (always shown)
         myOpenGenericParametersEditorButton = GUIDesigns::buildFXButton(getCollapsableFrame(), TL("Edit parameters"), "", "", nullptr, this, MID_GNE_ATTRIBUTESEDITOR_PARAMETERS, GUIDesignButton);
-        myOpenGenericParametersEditorButton->hide();
     }
     // Create help button
     myHelpButton = GUIDesigns::buildFXButton(getCollapsableFrame(), TL("Help"), "", "", nullptr, this, MID_GNE_ATTRIBUTESEDITOR_HELP, GUIDesignButtonRectangular);
@@ -114,18 +105,26 @@ GNEAttributesEditor::getEditedAttributeCarriers() const {
 
 void
 GNEAttributesEditor::showAttributesEditor(GNEAttributeCarrier* AC) {
+    // clean previous rows and ACs
     myEditedACs.clear();
+    myAttributesEditorRows.clear();
+    // set new ACs and Rows
     myEditedACs.push_back(AC);
+    myAttributesEditorRows = mySingletonAttributesEditorRows[myAttributeType];
     refreshAttributesEditor();
 }
 
 
 void
 GNEAttributesEditor::showAttributesEditor(const std::unordered_set<GNEAttributeCarrier*>& ACs) {
+    // clean previous rows and ACs
     myEditedACs.clear();
+    myAttributesEditorRows.clear();
+    // set new ACs and rows
     for (const auto& AC : ACs) {
         myEditedACs.push_back(AC);
     }
+    myAttributesEditorRows = mySingletonAttributesEditorRows[myAttributeType];
     refreshAttributesEditor();
 }
 
@@ -133,6 +132,7 @@ GNEAttributesEditor::showAttributesEditor(const std::unordered_set<GNEAttributeC
 void
 GNEAttributesEditor::hideAttributesEditor() {
     myEditedACs.clear();
+    myAttributesEditorRows.clear();
     // hide all rows before hidding table
     for (const auto& row : myAttributesEditorRows) {
         row->hideAttributeRow();
@@ -145,10 +145,10 @@ void
 GNEAttributesEditor::refreshAttributesEditor() {
     if (myEditedACs.size() > 0) {
         const auto tagProperty = myEditedACs.front()->getTagProperty();
-        int itRows = 0;
         bool showButtons = false;
-        // check if show netedit attributes (only for single edited ACs)
-        if ((myEditorOptions & EditorOptions::NETEDIT_ATTRIBUTES) != 0) {
+        int itRows = 0;
+        // check if show netedit attributes (only in edit mode)
+        if (myAttributeType == AttributeType::NETEDIT && (myEditorType == EditorType::EDITOR)) {
             // front button
             if (tagProperty->isDrawable()) {
                 myFrontButton->show();
@@ -182,11 +182,17 @@ GNEAttributesEditor::refreshAttributesEditor() {
                 }
 
             }
-        } else if ((myEditorOptions & EditorOptions::GENERIC_PARAMETERS) != 0) {
-            myOpenGenericParametersEditorButton->show();
         }
-        if ((myEditorOptions & EditorOptions::EXTENDED_ATTRIBUTES) != 0) {
-            myOpenExtendedAttributesButton->show();
+        // continue depending of attribute type
+        if (myAttributeType == AttributeType::EXTENDED) {
+            // only show extended attributes button (already created)
+            showButtons = true;
+        } else if (myAttributeType == AttributeType::PARAMETERS) {
+            // only show parameters row
+            myAttributesEditorRows[itRows]->showAttributeRow(this, tagProperty->getAttributeProperties(GNE_ATTR_PARAMETERS), isReparenting());
+            // set parameters button at the end
+            myOpenGenericParametersEditorButton->reparent(this);
+            // only show open parameters editor
             showButtons = true;
         } else {
             // Iterate over tag property of first AC and show row for every attribute
@@ -195,29 +201,37 @@ GNEAttributesEditor::refreshAttributesEditor() {
                 // check show conditions
                 if (attrProperty->isExtended()) {
                     showAttributeRow = false;
-                } else if (((myEditorOptions & EditorOptions::FLOW_ATTRIBUTES) == 0) && attrProperty->isFlow()) {
+                }
+                // filter editor type
+                if ((myEditorType != EditorType::CREATOR) && (myEditorType != EditorType::EDITOR)) {
                     showAttributeRow = false;
-                } else if (((myEditorOptions & EditorOptions::FLOW_ATTRIBUTES) != 0) && !attrProperty->isFlow()) {
+                }
+                if ((myEditorType == EditorType::CREATOR) && !attrProperty->isCreateMode()) {
                     showAttributeRow = false;
-                } else if (((myEditorOptions & EditorOptions::GEO_ATTRIBUTES) == 0) && attrProperty->isGEO()) {
+                }
+                if ((myEditorType == EditorType::EDITOR) && !attrProperty->isEditMode()) {
                     showAttributeRow = false;
-                } else if (((myEditorOptions & EditorOptions::GEO_ATTRIBUTES) != 0) && !attrProperty->isGEO()) {
+                }
+                // filter types
+                if ((myAttributeType == AttributeType::CHILD) && !attrProperty->isChild()) {
                     showAttributeRow = false;
-                } else if (((myEditorOptions & EditorOptions::NETEDIT_ATTRIBUTES) == 0) && attrProperty->isNetedit()) {
+                }
+                if ((myAttributeType == AttributeType::FLOW) && !attrProperty->isFlow()) {
                     showAttributeRow = false;
-                } else if (((myEditorOptions & EditorOptions::NETEDIT_ATTRIBUTES) != 0) && !attrProperty->isNetedit()) {
+                }
+                if ((myAttributeType == AttributeType::GEO) && !attrProperty->isGEO()) {
                     showAttributeRow = false;
-                } else if (((myEditorOptions & EditorOptions::GENERIC_PARAMETERS) == 0) && (attrProperty->getAttr() == GNE_ATTR_PARAMETERS)) {
+                }
+                if ((myAttributeType == AttributeType::NETEDIT) && !attrProperty->isNetedit()) {
                     showAttributeRow = false;
-                } else if (((myEditorOptions & EditorOptions::GENERIC_PARAMETERS) != 0) && (attrProperty->getAttr() != GNE_ATTR_PARAMETERS)) {
+                }
+                if (attrProperty->getAttr() == GNE_ATTR_PARAMETERS) {
                     showAttributeRow = false;
-                } else if ((myEditorOptions & EditorOptions::BASIC_ATTRIBUTES) != 0) {
-                    showAttributeRow = true;
                 }
                 if (showAttributeRow) {
-                    if (itRows < myMaxNumberOfRows) {
+                    if (itRows < (int)myAttributesEditorRows.size()) {
                         // only update if row was show successfully
-                        if (myAttributesEditorRows[itRows]->showAttributeRow(attrProperty, isReparenting())) {
+                        if (myAttributesEditorRows[itRows]->showAttributeRow(this, attrProperty, isReparenting())) {
                             itRows++;
                         }
                     } else {
@@ -225,19 +239,18 @@ GNEAttributesEditor::refreshAttributesEditor() {
                     }
                 }
             }
-        }
-        // hide rest of rows before showing table
-        for (int i = itRows; i < myMaxNumberOfRows; i++) {
-            myAttributesEditorRows[i]->hideAttributeRow();
+            // hide rest of rows before showing table
+            for (int i = itRows; i < (int)myAttributesEditorRows.size(); i++) {
+                myAttributesEditorRows[i]->hideAttributeRow();
+            }
         }
         // only show if at least one row or button was shown
         if ((itRows == 0) && !showButtons) {
             hideAttributesEditor();
         } else {
-            // check if show help button
-            if ((myEditorOptions & EditorOptions::GENERIC_PARAMETERS) != 0) {
-                myHelpButton->hide();
-            } else if (itRows > 0) {
+            if (itRows > 0) {
+                // reparent before show to put it at the end of the list
+                myHelpButton->reparent(this);
                 myHelpButton->show();
             } else {
                 myHelpButton->hide();
@@ -247,6 +260,49 @@ GNEAttributesEditor::refreshAttributesEditor() {
     } else {
         hideAttributesEditor();
     }
+}
+
+
+void
+GNEAttributesEditor::disableAttributesEditor() {
+    for (const auto& row : myAttributesEditorRows) {
+        row->disable();
+    }
+}
+
+
+bool
+GNEAttributesEditor::checkAttributes(const bool showWarning) {
+    for (const auto& row : myAttributesEditorRows) {
+        if (!row->isValueValid())
+            if (showWarning) {
+                const std::string errorMessage = TLF("Invalid value % of attribute %", row->getCurrentValue(), row->getAttrProperty()->getAttrStr());
+                // show warning
+                WRITE_WARNING(errorMessage);
+                // set message in status bar
+                myFrameParent->getViewNet()->setStatusBarText(errorMessage);
+                return false;
+            }
+    }
+    return true;
+}
+
+
+SumoXMLAttr
+GNEAttributesEditor::fillSumoBaseObject(CommonXMLStructure::SumoBaseObject* baseObject) const {
+    // iterate over every attribute row and stop if there was an error
+    for (const auto& row : myAttributesEditorRows) {
+        if (row->isAttributeRowShown()) {
+            const auto fillResult = row->fillSumoBaseObject(baseObject);
+            if (fillResult != SUMO_ATTR_NOTHING) {
+                return fillResult;
+            }
+        }
+    }
+    // handle special case for elemnt with start-end position over lanes
+    fillStartEndAttributes(baseObject);
+    // all ok, then return nothing
+    return SUMO_ATTR_NOTHING;
 }
 
 
@@ -342,20 +398,28 @@ void
 GNEAttributesEditor::setAttribute(SumoXMLAttr attr, const std::string& value) {
     const auto undoList = myFrameParent->getViewNet()->getUndoList();
     const auto tagProperty = myEditedACs.front()->getTagProperty();
-    // first check if we're editing a single attribute or an ID
-    if (myEditedACs.size() > 1) {
-        undoList->begin(tagProperty->getGUIIcon(), TLF("change multiple % attributes", tagProperty->getTagStr()));
-    } else if (attr == SUMO_ATTR_ID) {
-        // IDs attribute has to be encapsulated because implies multiple changes in different additionals (due references)
-        undoList->begin(tagProperty->getGUIIcon(), TLF("change % attribute", tagProperty->getTagStr()));
-    }
-    // Set new value of attribute in all edited ACs
-    for (const auto& editedAC : myEditedACs) {
-        editedAC->setAttribute(attr, value, undoList);
-    }
-    // finish change multiple attributes or ID Attributes
-    if ((myEditedACs.size() > 1) || (attr == SUMO_ATTR_ID)) {
-        undoList->end();
+    // continue depending if we're creating or inspecting
+    if (myEditorType == EditorType::CREATOR) {
+        // Set new value of attribute in all edited ACs without undo-redo
+        for (const auto& editedAC : myEditedACs) {
+            editedAC->setAttribute(attr, value);
+        }
+    } else if (myEditorType == EditorType::EDITOR) {
+        // first check if we're editing a single attribute or an ID
+        if (myEditedACs.size() > 1) {
+            undoList->begin(tagProperty->getGUIIcon(), TLF("change multiple % attributes", tagProperty->getTagStr()));
+        } else if (attr == SUMO_ATTR_ID) {
+            // IDs attribute has to be encapsulated because implies multiple changes in different additionals (due references)
+            undoList->begin(tagProperty->getGUIIcon(), TLF("change % attribute", tagProperty->getTagStr()));
+        }
+        // Set new value of attribute in all edited ACs
+        for (const auto& editedAC : myEditedACs) {
+            editedAC->setAttribute(attr, value, undoList);
+        }
+        // finish change multiple attributes or ID Attributes
+        if ((myEditedACs.size() > 1) || (attr == SUMO_ATTR_ID)) {
+            undoList->end();
+        }
     }
     refreshAttributesEditor();
     // update frame parent (needed to update other attribute tables)
@@ -425,6 +489,91 @@ GNEAttributesEditor::moveLaneDown() {
         // set previous lane
         setAttribute(SUMO_ATTR_LANE, lane->getParentEdge()->getChildLanes().at(lane->getIndex() - 1)->getID());
     }
+}
+
+
+void
+GNEAttributesEditor::fillStartEndAttributes(CommonXMLStructure::SumoBaseObject* baseObject) const {
+    if (baseObject->hasDoubleAttribute(SUMO_ATTR_POSITION) && baseObject->hasDoubleAttribute(GNE_ATTR_SIZE) &&
+            baseObject->hasDoubleAttribute(GNE_ATTR_LANELENGTH) && baseObject->hasBoolAttribute(GNE_ATTR_FORCESIZE) &&
+            baseObject->hasStringAttribute(GNE_ATTR_REFERENCE)) {
+        // extract parameters
+        const double centerPosition = baseObject->getDoubleAttribute(SUMO_ATTR_POSITION);
+        const double size = baseObject->getDoubleAttribute(GNE_ATTR_SIZE);
+        const double laneLength = baseObject->getDoubleAttribute(GNE_ATTR_LANELENGTH);
+        const bool forceSize = baseObject->getBoolAttribute(GNE_ATTR_FORCESIZE);
+        const auto reference = baseObject->getStringAttribute(GNE_ATTR_REFERENCE);
+        // we fill startPos and endPos using the existent parameters
+        double startPos = centerPosition - (size * 0.5);
+        double endPos = centerPosition + (size * 0.5);
+        if (reference == SUMOXMLDefinitions::ReferencePositions.getString(ReferencePosition::LEFT)) {
+            startPos = centerPosition - size;
+            endPos = centerPosition;
+        } else if (reference == SUMOXMLDefinitions::ReferencePositions.getString(ReferencePosition::RIGHT)) {
+            startPos = centerPosition;
+            endPos = centerPosition + size;
+        }
+        // adjust values
+        if (startPos < 0) {
+            startPos = 0;
+            if (forceSize) {
+                endPos = size;
+            }
+        }
+        if (endPos > laneLength) {
+            endPos = laneLength;
+            if (forceSize) {
+                startPos = laneLength - size;
+            }
+        }
+        if (startPos < 0) {
+            startPos = 0;
+        }
+        if (endPos > laneLength) {
+            endPos = laneLength;
+        }
+        // add it in baseObject
+        baseObject->addDoubleAttribute(SUMO_ATTR_STARTPOS, startPos);
+        baseObject->addDoubleAttribute(SUMO_ATTR_ENDPOS, endPos);
+    }
+}
+
+
+void
+GNEAttributesEditor::buildRows(GNEAttributesEditor* editorParent) {
+    // only build one time
+    if (mySingletonAttributesEditorRows.empty()) {
+        const auto tagPropertiesDatabase = editorParent->getFrameParent()->getViewNet()->getNet()->getTagPropertiesDatabase();
+        // declare vector of types with rows
+        const std::vector<AttributeType> types = {AttributeType::BASIC, AttributeType::CHILD, AttributeType::FLOW, AttributeType::GEO, AttributeType::NETEDIT, AttributeType::PARAMETERS};
+        // iterate over all types and create their correspond rows
+        for (const auto type : types) {
+            int maxNumberOfRows = 0;
+            // get max number of rows
+            if (type == AttributeType::BASIC) {
+                maxNumberOfRows = tagPropertiesDatabase->getMaxNumberOfEditableAttributeRows();
+            } else if (type == AttributeType::CHILD) {
+                maxNumberOfRows = tagPropertiesDatabase->getMaxNumberOfChildAttributeRows();
+            } else if (type == AttributeType::FLOW) {
+                maxNumberOfRows = tagPropertiesDatabase->getMaxNumberOfFlowAttributeRows();
+            } else if (type == AttributeType::GEO) {
+                maxNumberOfRows = tagPropertiesDatabase->getMaxNumberOfGeoAttributeRows();
+            } else if (type == AttributeType::NETEDIT) {
+                maxNumberOfRows = tagPropertiesDatabase->getMaxNumberOfNeteditAttributesRows();
+            } else if (type == AttributeType::PARAMETERS) {
+                maxNumberOfRows = 1;
+            } else {
+                throw ProcessError("Invalid editor option");
+            }
+            // resize myAttributesEditorRows and fill it with attribute rows
+            mySingletonAttributesEditorRows[type].resize(maxNumberOfRows);
+            for (int i = 0; i < (int)mySingletonAttributesEditorRows[type].size(); i++) {
+                mySingletonAttributesEditorRows[type][i] = new GNEAttributesEditorRow(editorParent);
+            }
+        }
+
+    }
+
 }
 
 /****************************************************************************/

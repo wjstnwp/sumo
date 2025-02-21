@@ -1353,7 +1353,7 @@ SequentialStringBijection::Entry SUMOXMLDefinitions::attrs[] = {
     { "shapeStart",                         GNE_ATTR_SHAPE_START },
     { "shapeEnd",                           GNE_ATTR_SHAPE_END },
     { "isBidi",                             GNE_ATTR_BIDIR },
-    { "closedShape",                        GNE_ATTR_CLOSE_SHAPE },
+    { "close shape",                        GNE_ATTR_CLOSE_SHAPE },
     { "parent",                             GNE_ATTR_PARENT },
     { "dataSet",                            GNE_ATTR_DATASET },
     { "genericParameter",                   GNE_ATTR_PARAMETERS },
@@ -1377,6 +1377,10 @@ SequentialStringBijection::Entry SUMOXMLDefinitions::attrs[] = {
     { "tazCentroid",                        GNE_ATTR_TAZ_CENTROID },
     { "terminate",                          GNE_ATTR_FLOW_TERMINATE },
     { "spacing",                            GNE_ATTR_FLOW_SPACING },
+    { "reference",                          GNE_ATTR_REFERENCE },
+    { "size",                               GNE_ATTR_SIZE },
+    { "force size",                         GNE_ATTR_FORCESIZE },
+    { "laneLength",                         GNE_ATTR_LANELENGTH },
     // mapped to additional elements on writing
     { "fromBusStop",                        GNE_ATTR_FROM_BUSSTOP },
     { "fromTrainStop",                      GNE_ATTR_FROM_TRAINSTOP },
@@ -1385,7 +1389,6 @@ SequentialStringBijection::Entry SUMOXMLDefinitions::attrs[] = {
     { "fromParkingArea",                    GNE_ATTR_FROM_PARKINGAREA },
     { "fromRoute",                          GNE_ATTR_FROM_ROUTE },
     { "isRoundabout",                       GNE_ATTR_IS_ROUNDABOUT },
-    { "close shape",                        GNE_ATTR_CLOSESHAPE },
     { "frontElement",                       GNE_ATTR_FRONTELEMENT },
 
     { "carriageLength",     SUMO_ATTR_CARRIAGE_LENGTH },
@@ -1669,6 +1672,12 @@ StringBijection<ExcludeEmpty>::Entry SUMOXMLDefinitions::excludeEmptyValues[] = 
     {"defaults",    ExcludeEmpty::DEFAULTS} //< must be the last one
 };
 
+StringBijection<ReferencePosition>::Entry SUMOXMLDefinitions::referencePositionValues[] = {
+    {"left",    ReferencePosition::LEFT},
+    {"right",   ReferencePosition::RIGHT},
+    {"center",  ReferencePosition::CENTER} //< must be the last one
+};
+
 SequentialStringBijection SUMOXMLDefinitions::Tags(
     SUMOXMLDefinitions::tags, SUMO_TAG_NOTHING);
 
@@ -1731,6 +1740,9 @@ StringBijection<POIIcon> SUMOXMLDefinitions::POIIcons(
 
 StringBijection<ExcludeEmpty> SUMOXMLDefinitions::ExcludeEmptys(
     SUMOXMLDefinitions::excludeEmptyValues, ExcludeEmpty::DEFAULTS, false);
+
+StringBijection<ReferencePosition> SUMOXMLDefinitions::ReferencePositions(
+    SUMOXMLDefinitions::referencePositionValues, ReferencePosition::CENTER, false);
 
 std::string
 SUMOXMLDefinitions::getJunctionIDFromInternalEdge(const std::string internalEdge) {

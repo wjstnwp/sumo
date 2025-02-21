@@ -36,9 +36,10 @@
 // member method definitions
 // ===========================================================================
 
-// ---------------------------------------------------------------------------
-// GNEEdgeData - methods
-// ---------------------------------------------------------------------------
+GNEEdgeData::GNEEdgeData(GNENet* net) :
+    GNEGenericData(GNE_TAG_EDGEREL_SINGLE, GUIIconSubSys::getIcon(GUIIcon::EDGEDATA), GLO_EDGEDATA, net) {
+}
+
 
 GNEEdgeData::GNEEdgeData(GNEDataInterval* dataIntervalParent, GNEEdge* edge, const Parameterised::Map& parameters) :
     GNEGenericData(GNE_TAG_EDGEREL_SINGLE, GUIIconSubSys::getIcon(GUIIcon::EDGEDATA), GLO_EDGEDATA, dataIntervalParent, parameters) {
@@ -327,6 +328,11 @@ GNEEdgeData::getHierarchyName() const {
 void
 GNEEdgeData::setAttribute(SumoXMLAttr key, const std::string& value) {
     setCommonAttribute(this, key, value);
+    if (isTemplate()) {
+        myDataIntervalParent->getDataSetParent()->updateAttributeColors();
+    }
+    // mark interval toolbar for update
+    myNet->getViewNet()->getIntervalBar().markForUpdate();
 }
 
 /****************************************************************************/

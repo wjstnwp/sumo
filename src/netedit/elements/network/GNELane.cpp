@@ -154,10 +154,14 @@ GNELane::DrawingConstants::drawSuperposed() const {
     return myDrawSuperposed;
 }
 
+
 // ---------------------------------------------------------------------------
 // GNELane - methods
 // ---------------------------------------------------------------------------
-
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4355) // mask warning about "this" in initializers
+#endif
 GNELane::GNELane(GNEEdge* edge, const int index) :
     GNENetworkElement(edge->getNet(), edge->getNBEdge()->getLaneID(index), GLO_LANE, SUMO_TAG_LANE, GUIIconSubSys::getIcon(GUIIcon::LANE)),
     myIndex(index),
@@ -180,6 +184,9 @@ GNELane::GNELane() :
     mySpecialColorValue(-1),
     myLane2laneConnections(this) {
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 
 GNELane::~GNELane() {
@@ -1576,11 +1583,7 @@ GNELane::getColorValue(const GUIVisualizationSettings& s, int activeScheme) cons
             if (getParentEdges().front()->getNBEdge()->isMacroscopicConnector()) {
                 return 9;
             } else if (isRailway(myPermissions)) {
-                if ((myPermissions & SVC_BUS) != 0) {
-                    return 6;
-                } else {
-                    return 5;
-                }
+                return 5;
             } else if ((myPermissions & SVC_PASSENGER) != 0) {
                 if ((myPermissions & (SVC_RAIL_CLASSES & ~SVC_RAIL_FAST)) != 0 && (myPermissions & SVC_SHIP) == 0) {
                     return 6;
@@ -1588,7 +1591,11 @@ GNELane::getColorValue(const GUIVisualizationSettings& s, int activeScheme) cons
                     return 0;
                 }
             } else {
-                return 7;
+                if ((myPermissions & SVC_RAIL_CLASSES) != 0 && (myPermissions & SVC_SHIP) == 0) {
+                    return 6;
+                } else {
+                    return 7;
+                }
             }
         case 1:
             return isAttributeCarrierSelected() || getParentEdges().front()->isAttributeCarrierSelected();

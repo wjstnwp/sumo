@@ -42,8 +42,7 @@
 
 GNEPoly::GNEPoly(SumoXMLTag tag, GNENet* net) :
     TesselatedPolygon("", "", RGBColor::BLACK, {}, false, false, 0, 0, 0, "", false, "", Parameterised::Map()),
-                  GNEAdditional("", net, GLO_POLYGON, tag, GUIIconSubSys::getIcon(GUIIcon::POLY), ""),
-mySimplifiedShape(false) {
+GNEAdditional("", net, GLO_POLYGON, tag, GUIIconSubSys::getIcon(GUIIcon::POLY), "") {
     // reset default values
     resetDefaultValues();
 }
@@ -54,7 +53,7 @@ GNEPoly::GNEPoly(GNENet* net, const std::string& id, const std::string& type, co
                  const Parameterised::Map& parameters) :
     TesselatedPolygon(id, type, color, shape, geo, fill, lineWidth, layer, angle, imgFile, relativePath, name, parameters),
     GNEAdditional(id, net, GLO_POLYGON, SUMO_TAG_POLY, GUIIconSubSys::getIcon(GUIIcon::POLY), ""),
-    mySimplifiedShape(false) {
+    myClosedShape(shape.isClosed()) {
     // check if imgFile is valid
     if (!imgFile.empty() && GUITexturesHelper::getTextureID(imgFile) == -1) {
         setShapeImgFile("");
@@ -82,6 +81,7 @@ GNEPoly::GNEPoly(SumoXMLTag tag, GNENet* net, const std::string& id, const Posit
     TesselatedPolygon(id, getJuPedSimType(tag), getJuPedSimColor(tag), shape, geo, getJuPedSimFill(tag), 1,
                       getJuPedSimLayer(tag), 0, "", false, name, parameters),
     GNEAdditional(id, net, getJuPedSimGLO(tag), tag, getJuPedSimIcon(tag), ""),
+    myClosedShape(shape.isClosed()),
     mySimplifiedShape(false) {
     // set GEO shape
     myGeoShape = myShape;
@@ -558,12 +558,6 @@ GNEPoly::getAttribute(SumoXMLAttr key) const {
             } else {
                 return TL("No geo-conversion defined");
             }
-        case GNE_ATTR_CLOSESHAPE:
-            if ((myShape.size() > 1) && (myShape.front() == myShape.back())) {
-                return True;
-            } else {
-                return False;
-            }
         case SUMO_ATTR_COLOR:
             return toString(getShapeColor());
         case SUMO_ATTR_FILL:
@@ -589,7 +583,7 @@ GNEPoly::getAttribute(SumoXMLAttr key) const {
         case SUMO_ATTR_NAME:
             return getShapeName();
         case GNE_ATTR_CLOSE_SHAPE:
-            return toString(myShape.isClosed());
+            return toString(myClosedShape);
         default:
             return getCommonAttribute(this, key);
     }
@@ -617,7 +611,6 @@ GNEPoly::setAttribute(SumoXMLAttr key, const std::string& value, GNEUndoList* un
         case SUMO_ATTR_ID:
         case SUMO_ATTR_SHAPE:
         case SUMO_ATTR_GEOSHAPE:
-        case GNE_ATTR_CLOSESHAPE:
         case SUMO_ATTR_COLOR:
         case SUMO_ATTR_FILL:
         case SUMO_ATTR_LINEWIDTH:
@@ -651,8 +644,6 @@ GNEPoly::isValid(SumoXMLAttr key, const std::string& value) {
             } else {
                 return canParse<PositionVector>(value);
             }
-        case GNE_ATTR_CLOSESHAPE:
-            return canParse<bool>(value);
         case SUMO_ATTR_COLOR:
             return canParse<RGBColor>(value);
         case SUMO_ATTR_FILL:
@@ -683,20 +674,7 @@ GNEPoly::isValid(SumoXMLAttr key, const std::string& value) {
         case SUMO_ATTR_NAME:
             return SUMOXMLDefinitions::isValidAttribute(value);
         case GNE_ATTR_CLOSE_SHAPE:
-            if (canParse<bool>(value) && (myShape.size() > 0)) {
-                bool closePolygon = parse<bool>(value);
-                if (closePolygon && (myShape.begin() == myShape.end())) {
-                    // Polygon already closed, then invalid value
-                    return false;
-                } else if (!closePolygon && (myShape.begin() != myShape.end())) {
-                    // Polygon already open, then invalid value
-                    return false;
-                } else {
-                    return true;
-                }
-            } else {
-                return false;
-            }
+            return canParse<bool>(value);
         default:
             return isCommonValid(key, value);
     }
@@ -720,8 +698,12 @@ GNEPoly::isAttributeEnabled(SumoXMLAttr key) const {
             } else {
                 return false;
             }
-        case GNE_ATTR_CLOSESHAPE:
-            return myShape.size() > 1;
+        case GNE_ATTR_CLOSE_SHAPE:
+            if (isTemplate()) {
+                return true;
+            } else {
+                return myShape.size() > 1;
+            }
         default:
             return true;
     }
@@ -785,16 +767,6 @@ GNEPoly::setAttribute(SumoXMLAttr key, const std::string& value) {
             updateCenteringBoundary(true);
             break;
         }
-        case GNE_ATTR_CLOSESHAPE: {
-            auto shape = myShape;
-            if (parse<bool>(value)) {
-                shape.push_back(shape.front());
-            } else {
-                shape.pop_back();
-            }
-            setAttribute(SUMO_ATTR_SHAPE, toString(shape));
-            break;
-        }
         case SUMO_ATTR_COLOR:
             setShapeColor(parse<RGBColor>(value));
             break;
@@ -835,19 +807,23 @@ GNEPoly::setAttribute(SumoXMLAttr key, const std::string& value) {
             setShapeName(value);
             break;
         case GNE_ATTR_CLOSE_SHAPE:
-            if (parse<bool>(value)) {
-                myShape.closePolygon();
-                myGeoShape.closePolygon();
-            } else {
-                myShape.openPolygon();
-                myGeoShape.openPolygon();
+            myClosedShape = parse<bool>(value);
+            if (!isTemplate()) {
+                if (myClosedShape) {
+                    myShape.closePolygon();
+                    myGeoShape.closePolygon();
+
+                } else {
+                    myShape.openPolygon();
+                    myGeoShape.openPolygon();
+                }
+                // disable simplified shape flag
+                mySimplifiedShape = false;
+                // update geometry
+                updateGeometry();
+                // update centering boundary
+                updateCenteringBoundary(true);
             }
-            // disable simplified shape flag
-            mySimplifiedShape = false;
-            // update geometry
-            updateGeometry();
-            // update centering boundary
-            updateCenteringBoundary(true);
             break;
         default:
             setCommonAttribute(this, key, value);

@@ -25,6 +25,8 @@
 #include <netedit/GNEViewParent.h>
 #include <netedit/dialogs/GNEAllowVClassesDialog.h>
 #include <netedit/frames/common/GNEInspectorFrame.h>
+#include <utils/foxtools/MFXLabelTooltip.h>
+#include <utils/foxtools/MFXTextFieldTooltip.h>
 #include <utils/gui/div/GUIDesigns.h>
 #include <utils/gui/images/POIIcons.h>
 #include <utils/gui/images/VClassIcons.h>
@@ -123,23 +125,30 @@ GNEAttributesEditorRow::GNEAttributesEditorRow(GNEAttributesEditor* attributeTab
     // set tip texts
     myValueLaneDownButton->setTipText(TL("Move element down one lane"));
     myValueLaneDownButton->setHelpText(TL("Move element down one lane"));
+    // start hidden
+    hide();
 }
 
 
 bool
-GNEAttributesEditorRow::showAttributeRow(const GNEAttributeProperties* attrProperty, const bool forceDisable) {
+GNEAttributesEditorRow::showAttributeRow(GNEAttributesEditor* attributeTable, const GNEAttributeProperties* attrProperty, const bool forceDisable) {
+    // update parent table
+    myAttributeTable = attributeTable;
     if (myAttributeTable->myEditedACs.empty()) {
         return false;
+    } else {
+        reparent(myAttributeTable->getCollapsableFrame());
     }
-    myAttribute = attrProperty->getAttr();
-    const auto tagProperty = attrProperty->getTagPropertyParent();
+    myAttrProperty = attrProperty;
+    const auto attribute = myAttrProperty->getAttr();
+    const auto tagPropertyParent = attrProperty->getTagPropertyParent();
     const auto firstEditedAC = myAttributeTable->myEditedACs.front();
     // check if we're editing multiple ACs
     const auto multipleEditedACs = (myAttributeTable->myEditedACs.size() > 1);
     // declare flag for show attribute enabled
     const bool attributeEnabled = isAttributeEnabled(attrProperty);
     // check if this attribute is computed
-    const bool computedAttribute = multipleEditedACs ? false : firstEditedAC->isAttributeComputed(myAttribute);
+    const bool computedAttribute = multipleEditedACs ? false : firstEditedAC->isAttributeComputed(attribute);
     // get string value depending if attribute is enabled
     const std::string value = getAttributeValue(attributeEnabled);
     // get parent if we're editing single vTypes
@@ -147,7 +156,7 @@ GNEAttributesEditorRow::showAttributeRow(const GNEAttributeProperties* attrPrope
     if (!multipleEditedACs && attrProperty->isVType()) {
         const auto& ACs = myAttributeTable->myFrameParent->getViewNet()->getNet()->getAttributeCarriers();
         // parent can be either type or distribution
-        if (myAttribute == SUMO_ATTR_TYPE) {
+        if (attribute == SUMO_ATTR_TYPE) {
             ACParent = ACs->retrieveDemandElement(SUMO_TAG_VTYPE, firstEditedAC->getAttribute(SUMO_ATTR_TYPE), false);
         }
         if (ACParent == nullptr) {
@@ -159,7 +168,7 @@ GNEAttributesEditorRow::showAttributeRow(const GNEAttributeProperties* attrPrope
         return hideAttributeRow();
     }
     // front element has their own button, and doesn't use the UndoList
-    if ((myAttribute == GNE_ATTR_FRONTELEMENT) || (myAttribute == GNE_ATTR_SELECTED)) {
+    if (attribute == GNE_ATTR_FRONTELEMENT) {
         return hideAttributeRow();
     }
     // if we have a disabled flow attribute, don't show row
@@ -167,31 +176,31 @@ GNEAttributesEditorRow::showAttributeRow(const GNEAttributeProperties* attrPrope
         return hideAttributeRow();
     }
     // expected and joins depend of triggered
-    if (tagProperty->isVehicleStop() && !attributeEnabled) {
-        if (myAttribute == SUMO_ATTR_EXPECTED) {
+    if (tagPropertyParent->isVehicleStop() && !attributeEnabled) {
+        if (attribute == SUMO_ATTR_EXPECTED) {
             return hideAttributeRow();
-        } else if (myAttribute == SUMO_ATTR_EXPECTED_CONTAINERS) {
+        } else if (attribute == SUMO_ATTR_EXPECTED_CONTAINERS) {
             return hideAttributeRow();
-        } else if (myAttribute == SUMO_ATTR_JOIN) {
+        } else if (attribute == SUMO_ATTR_JOIN) {
             return hideAttributeRow();
         }
     }
     // don't show stop offset exception if stopOffset is zero
-    if ((myAttribute == GNE_ATTR_STOPOEXCEPTION) && !attributeEnabled) {
+    if ((attribute == GNE_ATTR_STOPOEXCEPTION) && !attributeEnabled) {
         return hideAttributeRow();
     }
     // show elements depending of attribute properties
     if (attrProperty->isActivatable()) {
         showAttributeToggleEnable(attrProperty, attributeEnabled);
-    } else if (myAttribute == GNE_ATTR_PARENT) {
+    } else if (attribute == GNE_ATTR_PARENT) {
         showAttributeReparent(attributeEnabled);
-    } else if ((myAttribute == SUMO_ATTR_TYPE) && tagProperty->hasTypeParent()) {
+    } else if ((attribute == SUMO_ATTR_TYPE) && tagPropertyParent->hasTypeParent()) {
         showAttributeInspectParent(attrProperty, attributeEnabled);
-    } else if (attrProperty->isVClass() && (myAttribute != SUMO_ATTR_DISALLOW)) {
+    } else if (attrProperty->isVClass() && (attribute != SUMO_ATTR_DISALLOW)) {
         showAttributeVClass(attrProperty, attributeEnabled);
-    } else if (myAttribute == SUMO_ATTR_COLOR) {
+    } else if (attribute == SUMO_ATTR_COLOR) {
         showAttributeColor(attrProperty, attributeEnabled);
-    } else if (myAttribute == GNE_ATTR_PARAMETERS) {
+    } else if (attribute == GNE_ATTR_PARAMETERS) {
         hideAllAttributeElements();
     } else {
         showAttributeLabel(attrProperty);
@@ -205,7 +214,7 @@ GNEAttributesEditorRow::showAttributeRow(const GNEAttributeProperties* attrPrope
         showValueString(value, attributeEnabled, computedAttribute);
     }
     // check if show move lane buttons
-    if (!multipleEditedACs && !tagProperty->isNetworkElement() && (myAttribute == SUMO_ATTR_LANE)) {
+    if (!multipleEditedACs && !tagPropertyParent->isNetworkElement() && (attribute == SUMO_ATTR_LANE)) {
         showMoveLaneButtons(value);
         myValueLaneUpButton->show();
         myValueLaneDownButton->show();
@@ -228,23 +237,183 @@ GNEAttributesEditorRow::hideAttributeRow() {
 }
 
 
+void
+GNEAttributesEditorRow::disable() {
+    // disable all elements
+    myAttributeToggleEnableCheckButton->disable();
+    myAttributeReparentButton->disable();
+    myAttributeInspectParentButton->disable();
+    myAttributeVClassButton->disable();
+    myAttributeColorButton->disable();
+    myValueTextField->disable();
+    myValueComboBox->disable();
+    myValueCheckButton->disable();
+    myValueLaneUpButton->disable();
+    myValueLaneDownButton->disable();
+}
+
+
+const GNEAttributeProperties*
+GNEAttributesEditorRow::getAttrProperty() const {
+    return myAttrProperty;
+}
+
+
+std::string
+GNEAttributesEditorRow::getCurrentValue() const {
+    if (myValueCheckButton->shown()) {
+        return (myValueCheckButton->getCheck() == TRUE) ? "true" : "false";
+    } else if (myValueComboBox->shown()) {
+        return myValueComboBox->getText().text();
+    } else if (myValueTextField->shown()) {
+        return myValueTextField->getText().text();
+    } else {
+        return "";
+    }
+}
+
+
+bool
+GNEAttributesEditorRow::isValueValid() const {
+    if (myValueCheckButton->shown()) {
+        return true;
+    } else if (myValueComboBox->shown()) {
+        return (myValueComboBox->getTextColor() != TEXTCOLOR_RED) &&
+               (myValueComboBox->getBackColor() != TEXTCOLOR_BACKGROUND_RED);
+    } else if (myValueTextField->shown()) {
+        return (myValueTextField->getTextColor() != TEXTCOLOR_RED) &&
+               (myValueTextField->getBackColor() != TEXTCOLOR_BACKGROUND_RED);
+    } else {
+        return true;
+    }
+}
+
+
 bool
 GNEAttributesEditorRow::isAttributeRowShown() const {
     return shown();
 }
 
 
+SumoXMLAttr
+GNEAttributesEditorRow::fillSumoBaseObject(CommonXMLStructure::SumoBaseObject* baseObjet) const {
+    const auto attribute = myAttrProperty->getAttr();
+    if (myAttrProperty->isBool()) {
+        baseObjet->addBoolAttribute(attribute, myValueCheckButton->getCheck() == TRUE);
+    } else if (myAttrProperty->isDiscrete()) {
+        if ((myValueComboBox->getTextColor() == TEXTCOLOR_RED) ||
+                (myValueComboBox->getBackColor() == TEXTCOLOR_BACKGROUND_RED)) {
+            return attribute;
+        } else {
+            baseObjet->addStringAttribute(attribute, myValueComboBox->getText().text());
+        }
+    } else if ((myValueTextField->getTextColor() == TEXTCOLOR_RED) ||
+               (myValueTextField->getBackColor() == TEXTCOLOR_BACKGROUND_RED)) {
+        return attribute;
+    } else if (myAttrProperty->isInt()) {
+        // int value
+        if (GNEAttributeCarrier::canParse<int>(myValueTextField->getText().text())) {
+            const auto intValue = GNEAttributeCarrier::parse<int>(myValueTextField->getText().text());
+            if (myAttrProperty->isPositive() && (intValue < 0)) {
+                return attribute;
+            } else {
+                baseObjet->addIntAttribute(attribute, intValue);
+            }
+        } else if (myAttrProperty->hasDefaultValue() && (myValueTextField->getText() == "default")) {
+            // used for default cases
+            baseObjet->addIntAttribute(attribute, GNEAttributeCarrier::parse<int>(myAttrProperty->getDefaultValue()));
+        } else {
+            return attribute;
+        }
+    } else if (myAttrProperty->isFloat()) {
+        // double value
+        if (myAttrProperty->isList()) {
+            if (GNEAttributeCarrier::canParse<std::vector<double> >(myValueTextField->getText().text())) {
+                const auto doubleListValue = GNEAttributeCarrier::parse<std::vector<double> >(myValueTextField->getText().text());
+                // check every double
+                for (const auto doubleValue : doubleListValue) {
+                    if (myAttrProperty->isPositive() && (doubleValue < 0)) {
+                        return attribute;
+                    } else if (myAttrProperty->isFloat() && ((doubleValue < 0) || (doubleValue > 1))) {
+                        return attribute;
+                    }
+                }
+                baseObjet->addDoubleListAttribute(attribute, doubleListValue);
+            } else {
+                return attribute;
+            }
+        } else if (GNEAttributeCarrier::canParse<double>(myValueTextField->getText().text())) {
+            const auto doubleValue = GNEAttributeCarrier::parse<double>(myValueTextField->getText().text());
+            if (myAttrProperty->isPositive() && (doubleValue < 0)) {
+                return attribute;
+            } else if (myAttrProperty->isProbability() && ((doubleValue < 0) || (doubleValue > 1))) {
+                return attribute;
+            } else {
+                baseObjet->addDoubleAttribute(attribute, doubleValue);
+            }
+        } else if (myAttrProperty->hasDefaultValue() && (myValueTextField->getText() == "default")) {
+            // used for default cases (for example, shape layers)
+            baseObjet->addDoubleAttribute(attribute, GNEAttributeCarrier::parse<double>(myAttrProperty->getDefaultValue()));
+        } else {
+            return attribute;
+        }
+    } else if (myAttrProperty->isSUMOTime()) {
+        // time value
+        if (GNEAttributeCarrier::canParse<SUMOTime>(myValueTextField->getText().text())) {
+            const auto timeValue = GNEAttributeCarrier::parse<SUMOTime>(myValueTextField->getText().text());
+            if (timeValue < 0) {
+                return attribute;
+            } else {
+                baseObjet->addTimeAttribute(attribute, timeValue);
+            }
+        } else if (myAttrProperty->hasDefaultValue() && (myValueTextField->getText() == "default")) {
+            // used for default cases
+            baseObjet->addTimeAttribute(attribute, GNEAttributeCarrier::parse<SUMOTime>(myAttrProperty->getDefaultValue()));
+        } else {
+            return attribute;
+        }
+    } else if (myAttrProperty->isPosition()) {
+        // position value
+        if (myAttrProperty->isList()) {
+            if (GNEAttributeCarrier::canParse<PositionVector>(myValueTextField->getText().text())) {
+                baseObjet->addPositionVectorAttribute(attribute, GNEAttributeCarrier::parse<PositionVector>(myValueTextField->getText().text()));
+            } else {
+                return attribute;
+            }
+        } else if (GNEAttributeCarrier::canParse<Position>(myValueTextField->getText().text())) {
+            baseObjet->addPositionAttribute(attribute, GNEAttributeCarrier::parse<Position>(myValueTextField->getText().text()));
+        } else {
+            return attribute;
+        }
+    } else if (myAttrProperty->isColor()) {
+        // color value
+        if (GNEAttributeCarrier::canParse<RGBColor>(myValueTextField->getText().text())) {
+            baseObjet->addColorAttribute(attribute, GNEAttributeCarrier::parse<RGBColor>(myValueTextField->getText().text()));
+        } else {
+            return attribute;
+        }
+    } else if (myAttrProperty->isList()) {
+        baseObjet->addStringListAttribute(attribute, GNEAttributeCarrier::parse<std::vector<std::string> >(myValueTextField->getText().text()));
+    } else if (attribute == GNE_ATTR_PARAMETERS) {
+        baseObjet->addParameters(myValueTextField->getText().text());
+    } else {
+        baseObjet->addStringAttribute(attribute, myValueTextField->getText().text());
+    }
+    // all ok, then return nothing
+    return SUMO_ATTR_NOTHING;
+}
+
+
 long
 GNEAttributesEditorRow::onCmdOpenColorDialog(FXObject*, FXSelector, void*) {
-    const auto& attrProperty = myAttributeTable->myEditedACs.front()->getTagProperty()->getAttributeProperties(myAttribute);
     // create FXColorDialog
     FXColorDialog colordialog(myAttributeTable->getFrameParent()->getViewNet(), TL("Color Dialog"));
     colordialog.setIcon(GUIIconSubSys::getIcon(GUIIcon::COLORWHEEL));
     // If previous attribute wasn't correct, set black as default color
     if (GNEAttributeCarrier::canParse<RGBColor>(myValueTextField->getText().text())) {
         colordialog.setRGBA(MFXUtils::getFXColor(GNEAttributeCarrier::parse<RGBColor>(myValueTextField->getText().text())));
-    } else if (!attrProperty->getDefaultValue().empty()) {
-        colordialog.setRGBA(MFXUtils::getFXColor(GNEAttributeCarrier::parse<RGBColor>(attrProperty->getDefaultValue())));
+    } else if (!myAttrProperty->getDefaultValue().empty()) {
+        colordialog.setRGBA(MFXUtils::getFXColor(GNEAttributeCarrier::parse<RGBColor>(myAttrProperty->getDefaultValue())));
     } else {
         colordialog.setRGBA(MFXUtils::getFXColor(RGBColor::BLACK));
     }
@@ -263,7 +432,7 @@ GNEAttributesEditorRow::onCmdOpenAllowDialog(FXObject*, FXSelector, void*) {
     // declare accept changes
     bool acceptChanges = false;
     // open GNEAllowVClassesDialog (also used to modify SUMO_ATTR_CHANGE_LEFT etc)
-    GNEAllowVClassesDialog(myAttributeTable->getFrameParent()->getViewNet(), myAttribute, &allowedVehicles, &acceptChanges).execute();
+    GNEAllowVClassesDialog(myAttributeTable->getFrameParent()->getViewNet(), myAttrProperty->getAttr(), &allowedVehicles, &acceptChanges).execute();
     // continue depending of acceptChanges
     if (acceptChanges) {
         myValueTextField->setText(allowedVehicles.c_str(), TRUE);
@@ -306,7 +475,7 @@ GNEAttributesEditorRow::onCmdSetAttribute(FXObject* obj, FXSelector, void*) {
         return 0;
     }
     const auto& editedAC = myAttributeTable->myEditedACs.front();
-    const auto& attrProperties = editedAC->getTagProperty()->getAttributeProperties(myAttribute);
+    const auto attribute = myAttrProperty->getAttr();
     // continue depending of clicked object
     if (obj == myValueCheckButton) {
         // Set true o false depending of the checkBox
@@ -315,15 +484,15 @@ GNEAttributesEditorRow::onCmdSetAttribute(FXObject* obj, FXSelector, void*) {
         } else {
             myValueCheckButton->setText("false");
         }
-        myAttributeTable->setAttribute(myAttribute, myValueCheckButton->getText().text());
+        myAttributeTable->setAttribute(attribute, myValueCheckButton->getText().text());
     } else if (obj == myValueComboBox) {
         const std::string newValue = myValueComboBox->getText().text();
         // check if the new comboBox value is valid
-        if (editedAC->isValid(myAttribute, newValue)) {
+        if (editedAC->isValid(attribute, newValue)) {
             myValueComboBox->setTextColor(TEXTCOLOR_BLACK);
             myValueComboBox->setBackColor(TEXTCOLOR_BACKGROUND_WHITE);
             myValueTextField->killFocus();
-            myAttributeTable->setAttribute(myAttribute, newValue);
+            myAttributeTable->setAttribute(attribute, newValue);
         } else {
             // edit colors
             myValueComboBox->setTextColor(TEXTCOLOR_RED);
@@ -332,24 +501,19 @@ GNEAttributesEditorRow::onCmdSetAttribute(FXObject* obj, FXSelector, void*) {
             }
         }
     } else if (obj == myValueTextField) {
-        // check if we're merging junction
-        //if (!mergeJunction(myACAttr.getAttr(), newVal)) {
-        // if its valid for the first AC than its valid for all (of the same type)
-
-
         // first check if set default value
-        if (myValueTextField->getText().empty() && attrProperties->hasDefaultValue() && !attrProperties->isVClass()) {
+        if (myValueTextField->getText().empty() && myAttrProperty->hasDefaultValue() && !myAttrProperty->isVClass()) {
             // update text field without notify
-            myValueTextField->setText(attrProperties->getDefaultValue().c_str(), FALSE);
+            myValueTextField->setText(myAttrProperty->getDefaultValue().c_str(), FALSE);
         }
         // if we're editing an angle, check if filter between [0,360]
-        if ((myAttribute == SUMO_ATTR_ANGLE) && GNEAttributeCarrier::canParse<double>(myValueTextField->getText().text())) {
+        if ((attribute == SUMO_ATTR_ANGLE) && GNEAttributeCarrier::canParse<double>(myValueTextField->getText().text())) {
             // filter anglea and update text field without notify
             const double angle = fmod(GNEAttributeCarrier::parse<double>(myValueTextField->getText().text()), 360);
             myValueTextField->setText(toString(angle).c_str(), FALSE);
         }
         // if we're editing a position or a shape, strip whitespace after comma
-        if ((myAttribute == SUMO_ATTR_POSITION) || (myAttribute == SUMO_ATTR_SHAPE)) {
+        if ((attribute == SUMO_ATTR_POSITION) || (attribute == SUMO_ATTR_SHAPE)) {
             std::string shape(myValueTextField->getText().text());
             while (shape.find(", ") != std::string::npos) {
                 shape = StringUtils::replace(shape, ", ", ",");
@@ -357,7 +521,7 @@ GNEAttributesEditorRow::onCmdSetAttribute(FXObject* obj, FXSelector, void*) {
             myValueTextField->setText(toString(shape).c_str(), FALSE);
         }
         // if we're editing a int, strip decimal value
-        if (attrProperties->isInt() && GNEAttributeCarrier::canParse<double>(myValueTextField->getText().text())) {
+        if (myAttrProperty->isInt() && GNEAttributeCarrier::canParse<double>(myValueTextField->getText().text())) {
             double doubleValue = GNEAttributeCarrier::parse<double>(myValueTextField->getText().text());
             if ((doubleValue - (int)doubleValue) == 0) {
                 myValueTextField->setText(toString((int)doubleValue).c_str(), FALSE);
@@ -367,11 +531,11 @@ GNEAttributesEditorRow::onCmdSetAttribute(FXObject* obj, FXSelector, void*) {
         // after apply all filters, obtain value
         const std::string newValue = myValueTextField->getText().text();
         // check if the new textField value is valid
-        if (editedAC->isValid(myAttribute, newValue)) {
+        if (editedAC->isValid(attribute, newValue)) {
             myValueTextField->setTextColor(TEXTCOLOR_BLACK);
             myValueComboBox->setBackColor(TEXTCOLOR_BACKGROUND_WHITE);
             myValueTextField->killFocus();
-            myAttributeTable->setAttribute(myAttribute, newValue);
+            myAttributeTable->setAttribute(attribute, newValue);
         } else {
             // edit colors
             myValueTextField->setTextColor(TEXTCOLOR_RED);
@@ -386,7 +550,7 @@ GNEAttributesEditorRow::onCmdSetAttribute(FXObject* obj, FXSelector, void*) {
 
 long
 GNEAttributesEditorRow::onCmdToggleEnableAttribute(FXObject*, FXSelector, void*) {
-    myAttributeTable->toggleEnableAttribute(myAttribute, myAttributeToggleEnableCheckButton->getCheck() == TRUE);
+    myAttributeTable->toggleEnableAttribute(myAttrProperty->getAttr(), myAttributeToggleEnableCheckButton->getCheck() == TRUE);
     return 0;
 }
 
@@ -398,13 +562,30 @@ GNEAttributesEditorRow::GNEAttributesEditorRow() :
 
 const std::string
 GNEAttributesEditorRow::getAttributeValue(const bool enabled) const {
+    const auto attribute = myAttrProperty->getAttr();
+    // if we're in creator mode, generate ID
+    if ((attribute == SUMO_ATTR_ID) && (myAttributeTable->myEditorType == GNEAttributesEditor::EditorType::CREATOR)) {
+        const auto& ACs = myAttributeTable->getFrameParent()->getViewNet()->getNet()->getAttributeCarriers();
+        const auto parentTag = myAttrProperty->getTagPropertyParent()->getTag();
+        if (myAttrProperty->getTagPropertyParent()->isAdditionalElement()) {
+            return ACs->generateAdditionalID(parentTag);
+        } else if (myAttrProperty->getTagPropertyParent()->isDemandElement()) {
+            return ACs->generateDemandElementID(parentTag);
+        } else if (myAttrProperty->getTagPropertyParent()->isMeanData()) {
+            return ACs->generateMeanDataID(parentTag);
+        } else if (parentTag == SUMO_TAG_TYPE) {
+            return ACs->generateEdgeTypeID();
+        } else if (parentTag == SUMO_TAG_DATASET) {
+            return ACs->generateDataSetID("");
+        }
+    }
     if (enabled) {
         // Declare a set of occurring values and insert attribute's values of item (note: We use a set to avoid repeated values)
         std::set<std::string> values;
         // iterate over edited attributes and insert every value in set
         for (const auto& editedAC : myAttributeTable->myEditedACs) {
-            if (editedAC->hasAttribute(myAttribute)) {
-                values.insert(editedAC->getAttribute(myAttribute));
+            if (editedAC->hasAttribute(attribute)) {
+                values.insert(editedAC->getAttribute(attribute));
             }
         }
         // merge all values in a single string
@@ -418,7 +599,7 @@ GNEAttributesEditorRow::getAttributeValue(const bool enabled) const {
         // obtain value to be shown in row
         return oss.str();
     } else {
-        return myAttributeTable->myEditedACs.front()->getAlternativeValueForDisabledAttributes(myAttribute);
+        return myAttributeTable->myEditedACs.front()->getAlternativeValueForDisabledAttributes(attribute);
     }
 }
 
@@ -529,7 +710,6 @@ GNEAttributesEditorRow::showAttributeLabel(const GNEAttributeProperties* attrPro
 
 void
 GNEAttributesEditorRow::hideAllAttributeElements() {
-    // hide other elements
     myAttributeLabel->hide();
     myAttributeToggleEnableCheckButton->hide();
     myAttributeReparentButton->hide();

@@ -21,7 +21,11 @@
 #include <config.h>
 
 #include <vector>
+#include <map>
+#include <unordered_set>
 #include <utils/foxtools/MFXGroupBoxModule.h>
+#include <utils/xml/SUMOXMLDefinitions.h>
+#include <utils/xml/CommonXMLStructure.h>
 
 // ===========================================================================
 // class declaration
@@ -44,24 +48,31 @@ class GNEAttributesEditor : public MFXGroupBoxModule {
 
 public:
 
-    /// @brief Options for filter attributes
-    enum EditorOptions {
-        BASIC_ATTRIBUTES    = 1 << 0,
-        EXTENDED_ATTRIBUTES = 1 << 1,
-        FLOW_ATTRIBUTES     = 1 << 2,
-        GEO_ATTRIBUTES      = 1 << 3,
-        NETEDIT_ATTRIBUTES  = 1 << 4,
-        GENERIC_PARAMETERS  = 1 << 5
+    /// @brief Editor type
+    enum class EditorType {
+        CREATOR,    // used in create elements frames
+        EDITOR      // used in edit frames (inspector, vType..)
+    };
+
+    /// @brief Attribute types
+    enum class AttributeType {
+        BASIC,      // basic attributes
+        CHILD,      // child attributes (used if in the same frame we have already a BASIC editor)
+        EXTENDED,   // extended attributes (used in vType)
+        FLOW,       // flow attributes
+        GEO,        // GEO attributes (lon and lat)
+        NETEDIT,    // Netedit attributes (front, select...)
+        PARAMETERS, // Generic parameters
     };
 
     /// @brief constructor
-    GNEAttributesEditor(GNEFrame* frameParent, const std::string attributesEditorName, const int editorOptions);
+    GNEAttributesEditor(GNEFrame* frameParent, const std::string attributesEditorName, EditorType editorType, AttributeType attributeType);
 
     /// @brief pointer to GNEFrame parent
     GNEFrame* getFrameParent() const;
 
     /// @brief get edited attribute carriers
-    const std::vector<GNEAttributeCarrier*> &getEditedAttributeCarriers() const;
+    const std::vector<GNEAttributeCarrier*>& getEditedAttributeCarriers() const;
 
     /// @brief edit attributes of the given AC (usually the edited template AC)
     void showAttributesEditor(GNEAttributeCarrier* AC);
@@ -74,6 +85,15 @@ public:
 
     /// @brief refresh attribute editor
     void refreshAttributesEditor();
+
+    /// @brief disable attribute editor
+    void disableAttributesEditor();
+
+    /// @brief check if current edited attributes are valid
+    bool checkAttributes(const bool showWarning);
+
+    /// @brief fill sumo Base object
+    SumoXMLAttr fillSumoBaseObject(CommonXMLStructure::SumoBaseObject* baseObject) const;
 
     /// @name Functions related with selecting parents
     /// @{
@@ -137,12 +157,15 @@ protected:
 
     /// @}
 
+    /// @brief fill start end attributes
+    void fillStartEndAttributes(CommonXMLStructure::SumoBaseObject* baseObject) const;
+
 private:
+    /// @brief typedef used for pack attributes editor row
+    typedef std::map<AttributeType, std::vector<GNEAttributesEditorRow*> > AttributesEditorRows;
+
     /// @brief pointer to GNEFrame parent
     GNEFrame* myFrameParent;
-
-    /// @brief button for help
-    FXButton* myHelpButton;
 
     /// @brief pointer to front button
     FXButton* myFrontButton = nullptr;
@@ -156,18 +179,33 @@ private:
     /// @brief pointer to open generic parameters editor button
     FXButton* myOpenGenericParametersEditorButton = nullptr;
 
+    /// @brief button for help
+    FXButton* myHelpButton;
+
+    /// @brief singleton with attributes editor rows
+    static AttributesEditorRows mySingletonAttributesEditorRows;
+
     /// @brief current edited ACs
     std::vector<GNEAttributeCarrier*> myEditedACs;
 
-    /// @brief list of attributes editor rows
+    /// @brief singleton with attributes editor rows
     std::vector<GNEAttributesEditorRow*> myAttributesEditorRows;
 
     /// @brief check if we're reparent
     SumoXMLTag myReparentTag = SUMO_TAG_NOTHING;
 
-    /// @brief variable use for packing attribute editor options
-    int myEditorOptions = 0;
+    /// @brief variable use for packing editorType type options
+    const EditorType myEditorType = EditorType::EDITOR;
 
-    /// @brief maximum number of rows used in this attributes editor
-    int myMaxNumberOfRows = 0;
+    /// @brief variable use for packing attribute type options
+    const AttributeType myAttributeType = AttributeType::BASIC;
+
+    /// @brief build rows
+    static void buildRows(GNEAttributesEditor* editorParent);
+
+    /// @brief Invalidated copy constructor.
+    GNEAttributesEditor(GNEAttributesEditor*) = delete;
+
+    /// @brief Invalidated assignment operator.
+    GNEAttributesEditor& operator=(GNEAttributesEditor*) = delete;
 };

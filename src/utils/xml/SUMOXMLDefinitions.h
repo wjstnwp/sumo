@@ -1841,6 +1841,14 @@ enum SumoXMLAttr {
     GNE_ATTR_FLOW_TERMINATE,
     /// @brief flow spacing
     GNE_ATTR_FLOW_SPACING,
+    /// @brief reference position (used creating stoppingPlaces)
+    GNE_ATTR_REFERENCE,
+    /// @brief size (used in stopping places)
+    GNE_ATTR_SIZE,
+    /// @brief size (used in stopping places)
+    GNE_ATTR_FORCESIZE,
+    /// @brief size (used in stopping places)
+    GNE_ATTR_LANELENGTH,
     // virtual attributes for easier UI
     GNE_ATTR_FROM_BUSSTOP,
     GNE_ATTR_FROM_TRAINSTOP,
@@ -1849,7 +1857,6 @@ enum SumoXMLAttr {
     GNE_ATTR_FROM_PARKINGAREA,
     GNE_ATTR_FROM_ROUTE,
     GNE_ATTR_IS_ROUNDABOUT,
-    GNE_ATTR_CLOSESHAPE,
     GNE_ATTR_FRONTELEMENT,
     // @}
 
@@ -2256,6 +2263,13 @@ enum class ExcludeEmpty {
     DEFAULTS,
 };
 
+/// @brief Reference position
+enum class ReferencePosition {
+    LEFT,
+    RIGHT,
+    CENTER,
+};
+
 // @}
 
 /**
@@ -2336,6 +2350,9 @@ public:
 
     /// @brief exclude empty values
     static StringBijection<ExcludeEmpty> ExcludeEmptys;
+
+    /// @brief reference positions (used creating certain elements in netedit)
+    static StringBijection<ReferencePosition> ReferencePositions;
 
     /// @}
 
@@ -2453,6 +2470,9 @@ private:
 
     /// @brief Exclude empty values
     static StringBijection<ExcludeEmpty>::Entry excludeEmptyValues[];
+
+    /// @brief Reference position values
+    static StringBijection<ReferencePosition>::Entry referencePositionValues[];
 
     /// @}
 
