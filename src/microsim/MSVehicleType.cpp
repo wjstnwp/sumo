@@ -371,6 +371,9 @@ MSVehicleType::build(SUMOVTypeParameter& from) {
         case SUMO_TAG_CF_SMART_SK:
             vtype->myCarFollowModel = new MSCFModel_SmartSK(vtype);
             break;
+        case SUMO_TAG_CF_H3:
+            vtype->myCarFollowModel = new MSCFModel_H3(vtype);
+            break;
         case SUMO_TAG_CF_DANIEL1:
             vtype->myCarFollowModel = new MSCFModel_Daniel1(vtype);
             break;
